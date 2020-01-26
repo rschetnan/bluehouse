@@ -49,15 +49,22 @@ public class BluehouseTest
      */
     public void testApp()
     {
-        assertTrue( true );
+        double balance = 1008.00;
+        
+        for( int i = 0; i < 730; i++)
+        {
+        	balance += (balance * 0.01);
+        	
+        	System.out.println("Day " +  i + " balance = " + balance);
+        }
     }
     
-    public void testMain()
+    public void atestMain()
     {
-    	Bluehouse.main(new String[]{"0x514910771AF9Ca656af840dff83E8264EcF986CA", "1.0"});
+    	Bluehouse.main(new String[]{"jdbc:sqlite:C:/TopHat/TopHat.db"});
     }
     
-    public void testGetTokenPriceHistoryJson()
+    public void atestGetTokenPriceHistoryJson()
     {
     	String json = null;
     	
@@ -75,7 +82,7 @@ public class BluehouseTest
     	System.out.print(json);
     }
     
-    public void testGetTokenPriceHistory()
+    public void atestGetTokenPriceHistory()
     {
     	String json = null;
     	
@@ -121,7 +128,7 @@ public class BluehouseTest
     	
     }
     
-    public void testGetSimpleMovingAverages()
+    public void atestGetSimpleMovingAverages()
     {
     	String json = null;
     	
@@ -185,7 +192,7 @@ public class BluehouseTest
     	
     }
     
-    public void testGetExponentialMovingAverages()
+    public void atestGetExponentialMovingAverages()
     {
     	String json = null;
     	
@@ -244,7 +251,7 @@ public class BluehouseTest
     	
     }
     
-    public void testgetMACD()
+    public void atestgetMACD()
     {
     	String json = null;
     	
@@ -289,7 +296,7 @@ public class BluehouseTest
 
     }
     
-    public void testGetSignal()
+    public void atestGetSignal()
     {
     	
     	String json = null;
@@ -339,7 +346,7 @@ public class BluehouseTest
 		}
     }
     
-    public void testCalculateLastClose()
+    public void atestPrintLastCloseCalculation()
     {
     	String json = null;
     	
@@ -365,13 +372,8 @@ public class BluehouseTest
 			
 			Prices[] prices = history.getPrices();
 			
-			ArrayList<Prices> pricesList = new ArrayList<>();
+			Bluehouse.printLastCloseCalculation(prices);
 			
-			Collections.addAll(pricesList, prices);
-			
-			double close = Bluehouse.printLastCloseCalculation(prices);
-			
-			System.out.println(close);
 			
 			
 		} catch (Exception e) {
@@ -381,27 +383,42 @@ public class BluehouseTest
 
     }
     
-    public void testWriteCSVTrainingData()
+    public void atestPrintActionCalculation()
     {
-    	File file = null;
+    	String json = null;
+    	
 		try {
-			file = File.createTempFile("bluehouse", ".csv");
-		} catch (IOException e) {
-			fail(e.getMessage());
+			
+			json = Bluehouse.getTokenPriceHistoryJson("0x514910771AF9Ca656af840dff83E8264EcF986CA");
+			
+		} catch (ParseException | URISyntaxException | IOException e) {
+			
+			fail();
+			
 		}
-    	
-    	//Menudo.writeToCSV(menudoData, file);
-    	
-    	try {
-			Bluehouse.writeCSVTrainingData(file, "jdbc:sqlite:C:/TopHat/TopHat.db");
-		} catch (ParseException | URISyntaxException | IOException | SQLException e) {
+		
+		try {
+			
+			TokenPriceHistory tokenPriceHistory = Bluehouse.getTokenPriceHistory(json);
+			
+			assertNotNull(tokenPriceHistory);
+
+			History history = tokenPriceHistory.getHistory();
+			
+			assertNotNull(history);
+			
+			Prices[] prices = history.getPrices();
+			
+			Bluehouse.printActionCalculation(prices);
+			
+			
+			
+		} catch (Exception e) {
 			fail(e.getMessage());
+			e.printStackTrace();
 		}
-    	
-    	assertTrue(file.exists());
-    	
-   	 	System.out.println( "CSV data written to " + file.getAbsolutePath());
 
     }
 
+    
 }

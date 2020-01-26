@@ -1,7 +1,5 @@
 package net.rschetnan.bluehouse;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.sql.Connection;
@@ -11,14 +9,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -47,91 +41,16 @@ import weka.core.Instances;
 public class Bluehouse 
 {
 	
-    public static void main( String[] args )
+	public static void main(String[] args)
     {
-    	
-    	String tokenAddress = new String();
-    	
-    	if(args.length != 0 && !args[0].isEmpty())
-    	{
-    		tokenAddress = args[0];
-    	}
-    	
-
-    	String json = null;
-    	
-		try {
-			
-			json = Bluehouse.getTokenPriceHistoryJson(tokenAddress);
-			
-		} catch (ParseException | URISyntaxException | IOException e) {
-			
-			System.out.println(e.getMessage());
-			
-			return;
-			
-		}
-		
-		try {
-			
-			TokenPriceHistory tokenPriceHistory = Bluehouse.getTokenPriceHistory(json);
-			
-			History history = tokenPriceHistory.getHistory();
-			
-			Prices[] prices = history.getPrices();
-			
-			double[] closingPrices = Stream.of(prices).mapToDouble(p -> p.getClose()).toArray();
-			
-			double[] sma5 = getSimpleMovingAverages(closingPrices, 5);
-			
-			for(int i = 4; i < sma5.length; i++)
-			{
-				prices[i - 3].setOffsetSMA5(sma5[i]);
+		for(Tokens tokens : Tokens.values())
+		{
+			try {
+				printResults(tokens);
+				Thread.sleep(3000);
+			} catch (Exception e) {
+				System.out.println(e.getMessage());
 			}
-			
-			double[] sma10 = getSimpleMovingAverages(closingPrices, 10);
-			
-			for(int i = 9; i < sma10.length; i++)
-			{
-				prices[i - 3].setOffsetSMA10(sma10[i]);
-			}
-			
-			for(int i = 10; i < prices.length - 3 ; i++)
-			{
-				Action action = Action.LONG;
-				
-				if(prices[i].getOffsetSMA5() < prices[i - 1].getOffsetSMA5())
-				{
-					action = Action.SHORT;
-				}
-				if(prices[i].getOffsetSMA10() < prices[i - 1].getOffsetSMA10())
-				{
-					action = Action.SHORT;
-				}
-				if(prices[i].getOffsetSMA5() < prices[i].getOffsetSMA10())
-				{
-					action = Action.SHORT;
-				}
-				
-				prices[i].setAction(action);
-				
-			}
-			
-			printActionCalculation(prices);
-			
-			printLastCloseCalculation(prices);
-			
-			printLastHighCalculation(prices);
-			
-			printLastLowCalculation(prices);
-			
-			
-		} catch (Exception e) {
-
-			System.out.println(e.getMessage());
-			
-			return;
-			
 		}
 
     }
@@ -187,8 +106,10 @@ public class Bluehouse
     	classificationInstances.setClassIndex(trainingInstances.numAttributes() - 1);
     	
     	int i = prices.length - 1;
+    	
+    	String date = (prices[i].getDate());
 
-		LocalDate localDate = LocalDate.parse(prices[i].getDate());
+		LocalDate localDate = LocalDate.parse(date);
 		double[] values = new double[trainingInstances.numAttributes()];
 		values[1] = prices[i].getTs();
 		values[3] = localDate.getYear();
@@ -203,6 +124,14 @@ public class Bluehouse
 		double actionIndex = classifier.classifyInstance(classificationInstances.get(0));
 		
 		action = Action.valueOf(actions.get((int) actionIndex));
+		
+		System.out.println("Date: " + date);
+		
+		System.out.println();
+		
+		System.out.println("Opening Price: " + prices[i].getOpen());
+		
+		System.out.println();
 		
 		System.out.println("Calculated Action: " + action.name());
     	
@@ -248,8 +177,8 @@ public class Bluehouse
 //    	System.out.println();
 //    	System.out.print(trainingInstances.toString());
 //    	System.out.println();
-    	
-    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
+    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "189", "-K", "2", "-depth", "20"});
+    	//Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
     	classifier.buildClassifier(trainingInstances);
 
     	Evaluation evaluation = new Evaluation(trainingInstances);
@@ -260,8 +189,10 @@ public class Bluehouse
     	classificationInstances.setClassIndex(trainingInstances.numAttributes() - 1);
     	
     	int i = prices.length - 1;
+    	
+    	String date = prices[i].getDate();
 
-		LocalDate localDate = LocalDate.parse(prices[i].getDate());
+		LocalDate localDate = LocalDate.parse(date);
 		double[] values = new double[trainingInstances.numAttributes()];
 		values[0] = prices[i].getTs();
 		values[1] = localDate.getYear();
@@ -274,6 +205,9 @@ public class Bluehouse
 		classificationInstances.add(instance);
 		
 		close = classifier.classifyInstance(classificationInstances.get(0));
+		
+		System.out.println("Date: " + date);
+
 
 		System.out.println("Predicted close = " + close);
 		
@@ -320,7 +254,10 @@ public class Bluehouse
 //    	System.out.print(trainingInstances.toString());
 //    	System.out.println();
     	
-    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
+//    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
+    	
+    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "189", "-K", "2", "-depth", "20"});
+
     	classifier.buildClassifier(trainingInstances);
 
     	Evaluation evaluation = new Evaluation(trainingInstances);
@@ -331,6 +268,8 @@ public class Bluehouse
     	classificationInstances.setClassIndex(trainingInstances.numAttributes() - 1);
     	
     	int i = prices.length - 1;
+    	
+    	String date = prices[i].getDate();
 
 		LocalDate localDate = LocalDate.parse(prices[i].getDate());
 		double[] values = new double[trainingInstances.numAttributes()];
@@ -345,6 +284,9 @@ public class Bluehouse
 		classificationInstances.add(instance);
 		
 		high = classifier.classifyInstance(classificationInstances.get(0));
+		
+		System.out.println("Date: " + date);
+
 		
 		System.out.println("Predicted high = " + high);
 		
@@ -391,7 +333,8 @@ public class Bluehouse
 //    	System.out.print(trainingInstances.toString());
 //    	System.out.println();
     	
-    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
+//    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "10", "-K", "0", "-depth", "0"});
+    	Classifier classifier = AbstractClassifier.forName("weka.classifiers.trees.RandomForest", new String[]{"-I", "189", "-K", "2", "-depth", "20"});
     	classifier.buildClassifier(trainingInstances);
 
     	Evaluation evaluation = new Evaluation(trainingInstances);
@@ -402,6 +345,8 @@ public class Bluehouse
     	classificationInstances.setClassIndex(trainingInstances.numAttributes() - 1);
     	
     	int i = prices.length - 1;
+    	
+    	String date = prices[i].getDate();
 
 		LocalDate localDate = LocalDate.parse(prices[i].getDate());
 		double[] values = new double[trainingInstances.numAttributes()];
@@ -417,11 +362,79 @@ public class Bluehouse
 		
 		low = classifier.classifyInstance(classificationInstances.get(0));
 		
+		System.out.println("Date: " + date);
+		
 		System.out.println("Predicted low = " + low);
 		
 		System.out.println();
     	
     	System.out.println(evaluation.toSummaryString("Prediction Results", true));
+
+    }
+    
+    public static void printResults(Tokens tokens) throws Exception
+    {
+		System.out.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+		
+		System.out.println("Token: " + tokens.name() + " - " + tokens.getName());
+		
+		System.out.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+		
+		System.out.println();
+		
+			
+			String json = Bluehouse.getTokenPriceHistoryJson(tokens.getAddress());
+			
+			TokenPriceHistory tokenPriceHistory = Bluehouse.getTokenPriceHistory(json);
+			
+			History history = tokenPriceHistory.getHistory();
+			
+			Prices[] prices = history.getPrices();
+			
+			double[] closingPrices = Stream.of(prices).mapToDouble(p -> p.getClose()).toArray();
+			
+			double[] sma5 = getSimpleMovingAverages(closingPrices, 5);
+			
+			for(int i = 4; i < sma5.length; i++)
+			{
+				prices[i - 2].setOffsetSMA5(sma5[i]);
+			}
+			
+			double[] sma10 = getSimpleMovingAverages(closingPrices, 10);
+			
+			for(int i = 9; i < sma10.length; i++)
+			{
+				prices[i - 2].setOffsetSMA10(sma10[i]);
+			}
+			
+			for(int i = 10; i < prices.length - 3 ; i++)
+			{
+				Action action = Action.LONG;
+				
+				if(prices[i].getOffsetSMA5() < prices[i - 1].getOffsetSMA5())
+				{
+					action = Action.SHORT;
+				}
+				if(prices[i].getOffsetSMA10() < prices[i - 1].getOffsetSMA10())
+				{
+					action = Action.SHORT;
+				}
+				if(prices[i].getOffsetSMA5() < prices[i].getOffsetSMA10())
+				{
+					action = Action.SHORT;
+				}
+				
+				prices[i].setAction(action);
+				
+			}
+			
+			printActionCalculation(prices);
+			
+			printLastCloseCalculation(prices);
+			
+			printLastHighCalculation(prices);
+			
+			printLastLowCalculation(prices);
 
     }
     
@@ -549,142 +562,5 @@ public class Bluehouse
 
     	return tokenList;
     }
-
-    
-    public static void writeCSVTrainingData(File file, String url) throws ParseException, URISyntaxException, IOException, SQLException
-    {
-
-    	ArrayList<Token> tokenList = getTokens(url);
-    	
-    	LinkedHashMap<String, Prices[]> pricesMap = new LinkedHashMap<>();
-    	
-    	ArrayList<String> csvHeaders = new ArrayList<>();
-    	
-    	csvHeaders.add("YEAR");
-    	csvHeaders.add("MONTH");
-    	csvHeaders.add("DAY_OF_YEAR");
-    	csvHeaders.add("DAY_OF_MONTH");
-    	csvHeaders.add("DAY_OF_WEEK");
-    	
-    	//Need to skip small record sets
-    	int minPricesCount = 600;
-    	
-    	for(Token token : tokenList/*int i = 0; i < 5; i++*/)
-    	{
-    		
-    		//Token token = tokenList.get(i);
-			System.out.println("Processing " + token.getSymbol());
-			
-			if(token.getSymbol().equalsIgnoreCase("AE"))
-			{
-				continue;
-			}
-    		
-			if(token.getSymbol().equalsIgnoreCase("CMT"))
-			{
-				continue;
-			}
-
-			if(token.getSymbol().equalsIgnoreCase("NKN"))
-			{
-				continue;
-			}
-
-			if(token.getSymbol().equalsIgnoreCase("REP"))
-			{
-				continue;
-			}
-
-			if(token.getSymbol().equalsIgnoreCase("ELF"))
-			{
-				continue;
-			}
-
-			if(token.getSymbol().equalsIgnoreCase("LRC"))
-			{
-				continue;
-			}
-
-			String json = getTokenPriceHistoryJson(token.getAddress());
-    		TokenPriceHistory tokenPriceHistory = getTokenPriceHistory(json);
-    		int pricesCount = tokenPriceHistory.getHistory().getPrices().length;
-    		
-    		if(pricesCount < minPricesCount)
-    		{
-    			continue;
-    		}
-    		
-    		pricesMap.put(token.getSymbol(), tokenPriceHistory.getHistory().getPrices());
-    		
-    		//Need to wait for a moment before we make the next call
-			try {
-				Thread.sleep(5000);
-			} catch (InterruptedException e) {
-				System.out.println(e.getMessage());
-			}
-			
-			csvHeaders.add(token.getSymbol().concat("_PRICE"));
-			
-
-    	}
-    	
-    	//Add header for the BAT close price
-    	csvHeaders.add("BAT_CLOSE");
-    	
-    	String[] headersArray = {};
-    	
-    	String[] headers = csvHeaders.toArray(headersArray);
-    	
-    	Set<String> keys = pricesMap.keySet();
-    	
-    	try(FileWriter fileWriter = new FileWriter(file)) {
-    		
-			 try (CSVPrinter printer = new CSVPrinter(fileWriter, CSVFormat.DEFAULT
-			          .withHeader(headers))) {
-				 
-	    			ArrayList<ArrayList<Double>> data = new ArrayList<>();
-
-	    			for(int i = 0; i < minPricesCount; i++)
-			    	{
-			    		boolean includesDateFields = false;
-			    		
-			    		
-			    		ArrayList<Double> fields = new ArrayList<>();
-
-		    			for(String key : keys)
-			    		{
-		    				
-			    			if(!includesDateFields)
-			    			{
-			    	    		 LocalDate localDate = LocalDate.parse(pricesMap.get(key)[i].getDate());
-			    	    		 fields.add((double)localDate.getYear());
-			    	    		 fields.add((double)localDate.getMonthValue());
-			    	    		 fields.add((double)localDate.getDayOfYear());
-			    	    		 fields.add((double)localDate.getDayOfMonth());
-			    	    		 fields.add((double)localDate.getDayOfWeek().getValue());
-			    				 includesDateFields = true;
-			    			}
-			    			
-			    			fields.add(pricesMap.get(key)[i].getOpen());
-			    			
-			    		}
-			    		
-		    			fields.add(pricesMap.get("BAT")[i].getClose());
-		    			
-		    			data.add(fields);
-			    		
-			    	}
-			    	
-			    	printer.printRecords(data);
-				 
-			 }
-
-    		
-		} catch (IOException e) {
-			System.out.println(e.getMessage());
-		}    	
-
-    }
-    
 
 }
